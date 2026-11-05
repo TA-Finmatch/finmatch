@@ -1,0 +1,28 @@
+# Data processing
+numpy
+pandas
+scipy
+
+# Korean tokenization
+kiwipiepy
+
+# TF-IDF, topic models, similarity search, and evaluation
+scikit-learn
+
+# Word2Vec, FastText, and topic models
+gensim>=4.4.0,<5
+
+# Pretrained sentence embeddings
+torch
+sentence-transformers
+
+# Visualization
+matplotlib
+seaborn
+
+# Utilities
+tqdm
+python-dotenv
+
+# Jupyter notebook support in VS Code
+ipykernel
