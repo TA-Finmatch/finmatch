@@ -35,3 +35,6 @@ packaging==25.0
 
 # Jupyter notebook support in VS Code
 ipykernel==6.30.1
+
+# Compatibility with existing langchain-core 1.2.6
+packaging==25.0
