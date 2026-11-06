@@ -1,17 +1,18 @@
 # Python 3.12.14
+# Direct dependencies and the core embedding stack are pinned
 
-# Data processing
+# Data processing and numerical computation
 numpy==2.2.6
 pandas==2.3.3
 scipy==1.15.3
 
-# Korean tokenization
+# Korean morphological analysis and tokenization
 kiwipiepy==0.22.2
 
 # TF-IDF, topic models, similarity search, and evaluation
 scikit-learn==1.7.2
 
-# Word embeddings and topic models
+# Word2Vec, FastText, and topic models
 gensim==4.4.0
 
 # Pretrained sentence embeddings
@@ -25,12 +26,12 @@ huggingface-hub==0.36.0
 matplotlib==3.10.7
 seaborn==0.13.2
 
-# Utilities
+# Progress bars and environment variables
 tqdm==4.67.1
 python-dotenv==1.2.1
 
 # Compatibility with existing langchain-core 1.2.6
 packaging==25.0
 
-# Jupyter notebook support
+# Jupyter notebook support in VS Code
 ipykernel==6.30.1
