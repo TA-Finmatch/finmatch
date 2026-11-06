@@ -30,9 +30,6 @@ seaborn==0.13.2
 tqdm==4.67.1
 python-dotenv==1.2.1
 
-# Compatibility with existing langchain-core 1.2.6
-packaging==25.0
-
 # Jupyter notebook support in VS Code
 ipykernel==6.30.1
 
