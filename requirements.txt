@@ -2,15 +2,15 @@
 # Direct dependencies and the core embedding stack are pinned
 
 # Data processing and numerical computation
-numpy==2.2.6
+numpy==2.5.4
 pandas==2.3.3
-scipy==1.15.3
+scipy==1.18.1
 
 # Korean morphological analysis and tokenization
 kiwipiepy==0.22.2
 
 # TF-IDF, topic models, similarity search, and evaluation
-scikit-learn==1.7.2
+scikit-learn==1.9.1
 
 # Word2Vec, FastText, and topic models
 gensim==4.4.0
@@ -30,8 +30,8 @@ seaborn==0.13.2
 tqdm==4.67.1
 python-dotenv==1.2.1
 
-# Jupyter notebook support in VS Code
-ipykernel==6.30.1
-
 # Compatibility with existing langchain-core 1.2.6
 packaging==25.0
+
+# Jupyter notebook support in VS Code
+ipykernel==6.30.1
