@@ -1,18 +1,18 @@
-"""옛 ID (11-09 판) ↔ 새 ID (data/processed) 대응표를 만든다.
+"""옛 ID (11-09 판) ↔ 새 ID (data/processed/v2) 대응표를 만든다.
 11-09 판 product.csv · corpus.csv 를 preprocessing/_base_1109/ 에 두어야 돈다 (git 에는 올리지 않음).
 
 팀원 요청 3절: "기존 검색 단위를 변경했다면 이전 ID와 새 ID의 대응 관계 기록".
 
 입력
 - _base_1109/product.csv          : 11-09 판 원천 상품 8,000개 (unit_id · fund_id · product_name · source_file)
-- data/processed/products.jsonl            : 새 판 상품 7,966개 (product_id · unit_id · fund_id · source_locations)
+- data/processed/v2/products.jsonl            : 새 판 상품 7,966개 (product_id · unit_id · fund_id · source_locations)
 - work/지운이름_남긴이름.csv        : 공백만 다른 같은 이름 34쌍에서 지운 기록 → 남긴 기록
 
 잇는 열쇠는 원천 JSON 파일 이름 (source_file) 이다. 옛 판 8,000개와 새 판 7,966개의 파일 이름이
 모두 서로 다르고, 새 판에서 빠진 34개가 지운 기록 34개와 정확히 같아야 한다 (아래 assert).
 상품 이름으로도 한 번 더 맞춰 본다.
 
-출력 (data/processed/)
+출력 (preprocessing/records/)
 - 옛ID_새ID_상품.csv : 원천 상품 8,000개마다 한 줄
 - 옛ID_새ID_단위.csv : 옛 unit_id → 새 unit_id 짝마다 한 줄 (상품 수 · 관계 종류)
 - 마지막에 요약 숫자를 화면에 찍는다 (옛ID_새ID_설명.md 에 옮겨 적는다)
@@ -28,11 +28,11 @@ import pandas as pd
 HERE = Path(__file__).resolve().parent
 OLD_PRODUCT = HERE / "_base_1109" / "product.csv"
 OLD_CORPUS = HERE / "_base_1109" / "corpus.csv"
-PROCESSED = HERE.parent / "data" / "processed"
+PROCESSED = HERE.parent / "data" / "processed" / "v2"
 NEW_PRODUCTS = PROCESSED / "products.jsonl"
 NEW_CORPUS = PROCESSED / "corpus.jsonl"
 DELETED = HERE / "work" / "지운이름_남긴이름.csv"
-OUT_DIR = PROCESSED
+OUT_DIR = HERE / "records"
 
 REL_NAME = {
     (False, False): "그대로 1:1",

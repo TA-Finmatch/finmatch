@@ -22,8 +22,8 @@
 
 사용
 ----
-python evaluation/evaluation.py --questions data/processed/test.jsonl --predictions run.jsonl \
-    [--k 3] [--corpus data/processed/corpus.jsonl] [--per-question out.csv] [--include-needs-review]
+python evaluation/evaluation.py --questions data/processed/v2/test.jsonl --predictions run.jsonl \
+    [--k 3] [--corpus data/processed/v2/corpus.jsonl] [--per-question out.csv] [--include-needs-review]
 python evaluation/evaluation.py --self-test
 """
 

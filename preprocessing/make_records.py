@@ -1,9 +1,7 @@
 """최종 수정 요청 (11-17) 의 수정 기록을 만든다. JSONL 을 만든 뒤 돌린다.
 
-실행 (저장소 맨 위에서):
-    git show 6eb3d7e:data/processed/products.jsonl > /tmp/products_prev.jsonl
-    python preprocessing/make_records.py /tmp/products_prev.jsonl
-6eb3d7e 는 11-17 에 처음 올린 판 (검색 단위 3,871개) 이다.
+실행 (저장소 맨 위에서): python preprocessing/make_records.py data/processed/v1/products.jsonl
+v1 은 11-17 에 처음 올린 판 (검색 단위 3,871개), v2 는 최종 수정판이다.
 
 결과 (preprocessing/records/):
 - 단위ID_대응표.csv     : 이전 판 상품마다 이전 product_id · unit_id 와 최종 product_id · unit_id (원천 파일 이름으로 이음)
@@ -20,7 +18,7 @@ from collections import defaultdict
 import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(os.path.dirname(HERE), "data", "processed")
+DATA = os.path.join(os.path.dirname(HERE), "data", "processed", "v2")
 REC = os.path.join(HERE, "records")
 KEY = ["investment_type", "risk_grade", "protected_type", "maturity_type", "tax_type", "payment_type",
        "liquidity_conditions", "restriction_kind"]

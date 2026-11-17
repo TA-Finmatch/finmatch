@@ -1,7 +1,7 @@
 """팀원 수정 요청 반영판 — JSONL 4개를 쓴다 (T11, 2026-11-17).
 
 먼저 build.py → build_labels.py 를 돌려 work/ 의 pkl 을 만든 뒤 실행한다.
-결과: data/processed/{products,corpus,validation,test}.jsonl (UTF-8, 한 줄에 JSON 하나, 결측치는 null)
+결과: data/processed/v2/{products,corpus,validation,test}.jsonl (UTF-8, 한 줄에 JSON 하나, 결측치는 null)
 """
 import json
 import math
@@ -11,7 +11,7 @@ import pandas as pd
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
-OUT = os.path.join(os.path.dirname(HERE), "data", "processed")
+OUT = os.path.join(os.path.dirname(HERE), "data", "processed", "v2")
 SRC11 = ["product_name", "product_type", "protected_type", "maturity_type", "income_rate", "risk_grade",
          "tax_type", "payment_type", "loss_rate", "liquidity_conditions", "investment_strategy"]
 

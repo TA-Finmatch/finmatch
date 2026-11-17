@@ -1,10 +1,12 @@
 # finmatch 전처리 데이터 (2026-11-17 최종 수정판)
 
-팀원 수정 요청과 최종 수정 요청 (11-17) 에 맞춰 만든 데이터다. 모든 모델이 같은 검색 문서 목록 (`data/processed/corpus.jsonl`) 과 같은 질문 목록으로 검색하고, 정답은 `unit_id` 로 비교한다.
+팀원 수정 요청과 최종 수정 요청 (11-17) 에 맞춰 만든 데이터다. 모든 모델이 같은 검색 문서 목록 (`data/processed/v2/corpus.jsonl`) 과 같은 질문 목록으로 검색하고, 정답은 `unit_id` 로 비교한다.
 
 ## 1. 파일과 실험 역할
 
-| 파일 (`data/processed/`) | 한 줄이 뜻하는 것 | 줄 수 | 원천 |
+`data/processed/v1/` 은 11-17 에 처음 올린 판 (상품 7,966 · 단위 3,871) 이고, `data/processed/v2/` 가 이 README 가 설명하는 최종 수정판이다. 실험은 v2 를 쓴다.
+
+| 파일 (`data/processed/v2/`) | 한 줄이 뜻하는 것 | 줄 수 | 원천 |
 |---|---|---|---|
 | `products.jsonl` | 클래스별 원천 상품 1개 | 7,963 | AI Hub 원천 상품 8,000개 − 지운 기록 34개 − 뺀 상품 3개 |
 | `corpus.jsonl` | 검색 단위 1개 (검색할 문서) | 3,867 | 상품을 묶은 것 |
@@ -35,7 +37,7 @@
 
 - 투자전략은 사실상 같으면 같은 글로 본다. 엑셀 코드 · 위험등급 문장을 지운 뒤 비교해서, 다른 곳이 숫자가 아닌 5글자 이하이거나 한쪽에만 있는 분류 줄 · 위험등급 안내뿐이면 합쳤다.
 - `restricted` 는 가입 제한 종류 (`restriction_kind`) 까지 같아야 묶는다. `unknown` 상품은 하나씩 따로 둔다.
-- 값이 달라 나뉜 단위는 이유를 `records/단위_분리_이유.csv` 에 적었다 (같은 펀드 · 가입 구분인데 단위가 둘 이상인 409묶음). 가장 많은 이유는 unknown 하나씩 189, 투자전략 56, 세제혜택 41, 가입 제한 종류 25 이다.
+- 값이 달라 나뉜 단위는 이유를 `make_records.py` 가 단위 분리 이유 표로 만든다 (저장소에는 올리지 않음, 같은 펀드 · 가입 구분인데 단위가 둘 이상인 409묶음). 가장 많은 이유는 unknown 하나씩 189, 투자전략 56, 세제혜택 41, 가입 제한 종류 25 이다.
 - 클래스마다 다른 수익률 (`income_rate`) 은 `products.jsonl` 에만 있다. 단위의 대표값으로 고르거나 평균 내지 않았다.
 
 ## 4. 투자전략
@@ -76,8 +78,8 @@
 | 공백만 다른 같은 이름 상품 쌍에서 옛 기록 지움 | 34 | `review/시점_조사/최종_남길기록.csv` |
 | 손실 값이 다른 상품 뺌 (0.15% 2개 · 97.50% 1개) | 3 | `review/뺀_상품.csv` |
 | 이름이 깨진 상품의 펀드 이름 · 클래스를 직접 정함 | 105 | `review/클래스_직접확인.csv` |
-| 투자전략: 같은 펀드 다른 클래스 글로 복구 · 투자설명서 글로 채움 · Claude 가 씀 | 74 · 33 · 2 | `records/투자전략_처리_내역.csv` |
-| 지운 기록을 가리키던 정답을 남긴 기록으로 이음 | 68 | `records/정답_이름_보정_기록.csv` |
+| 투자전략: 같은 펀드 다른 클래스 글로 복구 · 투자설명서 글로 채움 · Claude 가 씀 | 74 · 33 · 2 | 상품마다 `strategy_flag` |
+| 지운 기록을 가리키던 정답을 남긴 기록으로 이음 | 68 | `build_labels.py` 가 만드는 보정 기록 (저장소에 없음) |
 | 정답 상품 이름의 원천 오타를 고쳐 이음 | 34 | 같은 파일 |
 | 뺀 상품이 정답이라 잇지 못한 질문 (`needs_review`) | 7 | 같은 파일 |
 | validation · test 사이의 같은 질문 | 0 | |
@@ -94,8 +96,8 @@
 
 ## 8. 코드와 기록
 
-- 순서 (저장소 맨 위에서): `python preprocessing/build.py` → `build_labels.py` → `write_jsonl.py` → `check.py` → `make_records.py <이전 판 products.jsonl>`. pandas 가 필요하고, AI Hub 원천 (Training · Validation 폴더) 을 `data/raw/` 에 둔다.
+- 순서 (저장소 맨 위에서): `python preprocessing/build.py` → `build_labels.py` → `write_jsonl.py` → `check.py` → `make_records.py data/processed/v1/products.jsonl`. pandas 가 필요하고, AI Hub 원천 (Training · Validation 폴더) 을 `data/raw/` 에 둔다.
 - `review/` 의 표는 사람이 정한 결정이라 코드가 읽는다.
-- `records/`: `점검_결과.md` (최종 점검), `단위ID_대응표.csv` (11-17 첫 판 ↔ 최종 판 ID), `단위_분리_이유.csv`, `투자전략_처리_내역.csv`, `정답_이름_보정_기록.csv`.
+- `check.py` · `make_records.py` 는 점검 결과와 수정 기록 (ID 대응표 · 단위 분리 이유 · 투자전략 처리 내역 · 정답 이름 보정 기록) 을 `preprocessing/records/` 에 쓴다. 이 폴더는 저장소에 올리지 않는다.
 - 상품 3개를 빼면서 product_id 와 unit_id 가 모두 다시 매겨졌다. 첫 판 ID 로 해 둔 것이 있으면 `단위ID_대응표.csv` 로 옮긴다.
 - 주의: test 질문 801개 중 688개는 정답 단위가 모두 validation 정답에도 나온다. validation 질문과 정답 쌍으로 학습하거나 검색 글에 섞으면 test 점수가 실제보다 높게 나올 수 있다.

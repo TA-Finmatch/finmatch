@@ -10,7 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # pipeline.py · class_codes.py 가 같은 폴더에 있다
 import pipeline as pl  # noqa: E402
 
-OUT = os.path.join(os.path.dirname(HERE), "data", "processed")
+OUT = os.path.join(os.path.dirname(HERE), "data", "processed", "v2")
 REC = os.path.join(HERE, "records")
 ATTR = ["protected_type", "maturity_type", "tax_type", "payment_type", "liquidity_conditions"]
 KO = {"general": "일반", "pension": "연금", "restricted": "가입 제한", "unknown": "미확인"}

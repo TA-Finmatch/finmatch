@@ -1,6 +1,6 @@
 """팀원 수정 요청 반영판 — 상품 줄과 검색 단위를 만든다 (T9, 2026-11-17).
 
-원천 (data/raw) 은 읽기만 한다. 결정의 근거는 preprocessing/review/ 아래 표들과 data/processed/수정_미확인_목록.md 다.
+원천 (data/raw) 은 읽기만 한다. 결정의 근거는 preprocessing/review/ 아래 표들과 preprocessing/README.md 다.
   - review/클래스_직접확인.csv               : 이름이 깨진 상품 105개의 펀드 이름 · 클래스를 사람이 정한 표
   - review/투자설명서_조사/클래스_뜻_조사결과.csv : 판매 경로를 몰랐던 클래스 32개의 가입 구분 (투자설명서 조사)
   - review/시점_조사/최종_남길기록.csv         : 공백만 다른 같은 이름 34쌍에서 남길 기록 (지울 기록 34개)
