@@ -57,6 +57,7 @@ def main():
     unit_of = dict(zip(p.product_id, p.unit_id))
     a = pd.read_csv(os.path.join(OUT, "지운이름_남긴이름.csv"), encoding="utf-8-sig")
     alias = dict(zip(a["지운_기록"], a["남길_기록"]))
+    removed = set(pd.read_csv(os.path.join(HERE, "review", "뺀_상품.csv"), encoding="utf-8-sig")["상품_이름"])
     rows, log = [], []
     for folder, pat in [("Training", "TL_1*"), ("Validation", "VL_1*")]:
         pre, role, out_file = ROLE[folder]
@@ -68,6 +69,8 @@ def main():
             pids, bad = [], []
             for n in names:
                 pid, rule = link(n, by_name, by_nows, alias)
+                if pid is None and n in removed:
+                    rule = "뺀 상품 (손실 값이 달라 11-17 에 뺌) → 정답을 잇지 않고 needs_review"
                 if pid is None:
                     bad.append(n)
                 else:

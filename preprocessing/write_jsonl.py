@@ -40,12 +40,21 @@ def write(path, rows):
     return len(rows)
 
 
+ACCOUNT_KO = {"general": "일반", "pension": "연금", "restricted": "가입 제한", "unknown": "미확인"}
+
+
 def search_text(u):
-    """최종 속성 + 투자전략. 원천 값을 그대로 이어 붙이고 새 말을 지어내지 않는다.
-    유형 자리는 원천 product_type (6개) 그대로 (11-17 진우님: 상품마다 원래 6개)."""
-    parts = [u["fund_name"], u["product_type"], f"위험등급 {u['risk_grade_raw']}", u["protected_type"], u["maturity_type"],
-             f"세제 혜택 {u['tax_type']}", u["payment_type"], f"손실 {u['loss_rate']}", u["liquidity_conditions"]]
-    return (". ".join(str(x) for x in parts) + ". " + (u["strategy"] or "")).strip()
+    """확정된 속성으로 검색 문서를 만든다 (11-17 팀원 최종 요청 5절). 원천 값을 그대로 쓰고 새 말을 지어내지 않는다.
+    값이 없는 칸 (투자유형 null 등) 은 줄을 넣지 않는다. 투자전략은 strategy_status 가 available 일 때만 넣는다.
+    손실 칸은 넣지 않는다 (남은 상품이 모두 "최대 100%" 라 구별에 쓸 수 없음)."""
+    acc = ACCOUNT_KO[u["account_type"]] + (f" ({u['restriction_kind']})" if u["restriction_kind"] else "")  # 가입 제한은 종류까지
+    parts = [("상품명", u["fund_name"]), ("가입 구분", acc), ("투자유형", u["investment_type"]),
+             ("위험등급", u["risk_grade_raw"]), ("원금보장 여부", u["protected_type"]), ("만기", u["maturity_type"]),
+             ("세제혜택", u["tax_type"]), ("납입 방식", u["payment_type"]), ("유동성", u["liquidity_conditions"])]
+    if u["strategy_status"] in ("available", "generated") and u["strategy"]:
+        parts.append(("투자전략", u["strategy"]))
+    return " ".join(f"{k}: {str(v).strip()}." if not str(v).strip().endswith(".") else f"{k}: {str(v).strip()}"
+                    for k, v in parts if v is not None and v == v and str(v).strip())
 
 
 def main():
@@ -53,25 +62,25 @@ def main():
     u = pd.read_pickle(os.path.join(WORK, "units.pkl"))
     q = pd.read_pickle(os.path.join(WORK, "questions.pkl"))
     os.makedirs(OUT, exist_ok=True)
-    raw_grade = dict(zip(p.unit_id, p.risk_grade))  # 단위 안 상품은 위험등급이 모두 같다 (build 의 단위 규칙)
 
     prows = [dict(product_id=r.product_id, fund_id=r.fund_id, unit_id=r.unit_id, fund_name=r.fund_name,
                   share_class=r.share_class, class_status=r.class_status, account_type=r.account_type,
                   account_type_basis=r.account_type_basis, investment_type=r.investment_type,
+                  strategy_status=r.strategy_status, strategy_flag=r.strategy_flag,
                   source_locations=r.source_locations, source={c: r[c] for c in SRC11})
              for _, r in p.sort_values("product_id").iterrows()]
 
     crows = []
     for _, r in u.sort_values("unit_id").iterrows():
         d = r.to_dict()
-        d["risk_grade_raw"] = raw_grade[r.unit_id]
         crows.append(dict(unit_id=r.unit_id, fund_id=r.fund_id, fund_name=r.fund_name, account_type=r.account_type,
+                          restriction_kind=r.restriction_kind,
                           source_product_ids=r.source_product_ids, class_list=r.class_list, n_products=r.n_products,
                           product_type=r.product_type, investment_type=r.investment_type, risk_grade=r.risk_grade,
                           protected_type=r.protected_type, maturity_type=r.maturity_type, tax_type=r.tax_type,
                           payment_type=r.payment_type, loss_rate=r.loss_rate, liquidity_conditions=r.liquidity_conditions,
-                          strategy=r.strategy,  # strategy_status · strategy_flag 는 내보내지 않는다 (11-17 진우님)
-                         
+                          strategy=r.strategy if r.strategy_status in ("available", "generated") else None,
+                          strategy_status=r.strategy_status, strategy_flag=r.strategy_flag,
                           search_text=search_text(d)))
 
     def qrows(name):

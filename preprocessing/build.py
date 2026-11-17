@@ -23,7 +23,6 @@ import pipeline as pl  # noqa: E402
 
 REV = os.path.join(HERE, "review")
 OUT = os.path.join(HERE, "work")
-ATTR7 = ["risk_grade", "protected_type", "maturity_type", "tax_type", "payment_type", "loss_rate", "liquidity_conditions"]
 SRC11 = ["product_name", "product_type", "protected_type", "maturity_type", "income_rate", "risk_grade",
          "tax_type", "payment_type", "loss_rate", "liquidity_conditions", "investment_strategy"]
 NOWS = lambda s: re.sub(r"\s", "", s)  # noqa: E731
@@ -45,6 +44,10 @@ def load():
     assert drop <= set(p.product_name)
     alias = dict(zip(keep["지울_기록"], keep["남길_기록"]))
     p = p[~p.product_name.isin(drop)].reset_index(drop=True)
+    # 1-2. 손실 값이 다른 상품 3개를 뺀다 (11-17 진우님). 이 이름을 정답으로 쓴 질문은 정답 잇기에서 needs_review 가 된다
+    out = pd.read_csv(os.path.join(REV, "뺀_상품.csv"), encoding="utf-8-sig")
+    assert set(out["상품_이름"]) <= set(p.product_name)
+    p = p[~p.product_name.isin(set(out["상품_이름"]))].reset_index(drop=True)
     # 2. 이름이 깨진 105개: 사람이 정한 펀드 이름 · 클래스
     t = pd.read_csv(os.path.join(REV, "클래스_직접확인.csv"), encoding="utf-8-sig", dtype=str, keep_default_na=False)
     fixf, fixc = dict(zip(t["상품_이름_원문"], t["펀드_이름_고침"])), dict(zip(t["상품_이름_원문"], t["클래스_고침"]))
@@ -128,19 +131,69 @@ def same_text(a, b):
     return True
 
 
-def text_groups(p, opts):
-    """같은 펀드 · 가입 구분 · 유형 · 속성 안에서 사실상 같은 투자전략 글끼리 한 무리로 묶는다.
-    비교는 엑셀 코드 · 위험등급 문장을 지운 정리본으로 한다. 무리 이름 = 가장 긴 정리본."""
-    def norm(s):
-        raw = re.sub(r"_x00[0-9A-Fa-f]{2}_", " ", str(s).replace("_x000D_", "").replace("_x0002_", "-"))
-        return re.sub(r"[\s\W_]", "", pl.merge_sentences([pl.clean_strategy(raw, opts)]) or raw)
-    p["_c"] = p.investment_strategy.map(norm)
+KEY_ATTR = ["risk_grade", "protected_type", "maturity_type", "tax_type", "payment_type", "liquidity_conditions"]  # 검색 문서에 들어가는 속성
+ACCOUNT_KO = {"general": "일반", "pension": "연금", "restricted": "가입 제한", "unknown": "미확인"}
+
+
+def _raw(s):
+    s = str(s) if s is not None and s == s else ""
+    s = s.replace("_x000D_", "").replace("_x0002_", "-")
+    return re.sub(r"_x00[0-9A-Fa-f]{2}_", " ", s)
+
+
+def product_strategy(p):
+    """상품마다 검색에 쓸 투자전략과 상태를 정한다 (11-17 팀원 최종 요청 3절).
+    - review/투자전략_판정.csv: 자동 검사 (위험등급 문장 · 형제 클래스와 다른 글 · 기존 표시) 에 걸린 361개를 에이전트가 읽고 판정한 표
+    - available 만 검색 문서에 쓴다. 원천 글 (source.investment_strategy) 은 그대로 둔다."""
+    opts = dict(pl.BASE)
+    j = pd.read_csv(os.path.join(REV, "투자전략_판정.csv"), encoding="utf-8-sig", dtype=str).fillna("")
+    judge = {NOWS(r["상품_이름"]): r for _, r in j.iterrows()}
+    raw_by_name = {NOWS(n): _raw(t) for n, t in zip(p.product_name, p.investment_strategy)}
+    clean = lambda t: pl.merge_sentences([pl.clean_strategy(t, opts)]) if t.strip() else ""  # noqa: E731
+    st, fl, txt = [], [], []
+    for n, t in zip(p.product_name, p.investment_strategy):
+        raw, r = _raw(t), judge.get(NOWS(n))
+        if not raw.strip():
+            s_, f_, c_ = "missing", "원천 글 없음", ""
+        elif r is None:  # 자동 검사에 안 걸림
+            c_ = clean(raw)
+            s_, f_ = ("available", None) if c_ else ("missing", "경고문뿐")
+        elif r["판정"] == "맞음" and r["운용사_불일치"]:
+            s_, f_, c_ = "needs_review", "글의 운용사 이름이 펀드와 다름", ""
+        elif r["판정"] == "맞음":
+            c_ = clean(raw)
+            s_, f_ = ("available", "자동 검사에 걸렸으나 읽어 보니 맞음") if c_ else ("missing", "경고문뿐")
+        elif r["복구_상품_이름"]:
+            c_ = clean(raw_by_name[NOWS(r["복구_상품_이름"])])
+            s_, f_ = "available", "같은 펀드 다른 클래스 글로 복구: " + r["복구_상품_이름"]
+        elif r["판정"] == "남의 글":
+            s_, f_, c_ = "missing", "다른 상품의 글로 판정, 복구할 글 없음", ""
+        else:
+            s_, f_, c_ = "needs_review", "글이 이 상품 것인지 확인하지 못함", ""
+        st.append(s_), fl.append(f_), txt.append(c_ if s_ == "available" else "")
+    # 쓸 글이 없는 상품은 투자설명서 · 공시에서 찾은 글로 채운다. 끝까지 못 찾은 펀드는 Claude 가 쓴 설명 (generated)
+    # (11-17 진우님: "찾을 수 있는건 찾아서 넣고 찾아봐도 없으면 비슷하게 채워넣자")
+    ext = pd.read_csv(os.path.join(REV, "투자전략_외부보완.csv"), encoding="utf-8-sig", dtype=str).fillna("")
+    ext = {NOWS(r["펀드_이름"]): r for _, r in ext.iterrows()}
+    for i, (f, s_) in enumerate(zip(p.fund_name, st)):
+        r = ext.get(NOWS(f))
+        if s_ != "available" and r is not None:
+            gen = r["출처_종류"].startswith("생성")
+            st[i] = "generated" if gen else "available"
+            fl[i] = f"{fl[i]} → {'Claude 가 쓴 설명 (원문 아님)' if gen else '투자설명서 · 공시 글로 채움'}: {r['출처_종류']} {r['출처_URL']}"
+            txt[i] = r["투자전략"]
+    p["strategy_status"], p["strategy_flag"], p["strategy_use"] = st, fl, txt
+    return p
+
+
+def text_groups(p):
+    """같은 펀드 · 가입 구분 · 핵심 속성 안에서 사실상 같은 검색용 투자전략끼리 한 무리로 묶는다. 무리 이름 = 가장 긴 글."""
+    p["_c"] = p.strategy_use.map(lambda t: re.sub(r"[\s\W_]", "", t))
     rep = {}
-    for _, d in p.groupby(["fund_key", "account_type", "product_type"] + ATTR7):
-        texts = sorted(d._c.unique(), key=lambda t: (-len(t), t))
+    for _, d in p.groupby(["fund_key", "account_type", "_inv"] + KEY_ATTR):
         heads = []
-        for t in texts:  # 긴 글부터: 이미 있는 무리와 같은 글이면 그 무리로
-            h = next((h for h in heads if same_text(h, t)), None)
+        for t in sorted(d._c.unique(), key=lambda t: (-len(t), t)):
+            h = next((h for h in heads if (h == "") == (t == "") and same_text(h, t)), None)
             if h is None:
                 heads.append(t)
             for i in d.index[d._c == t]:
@@ -148,44 +201,47 @@ def text_groups(p, opts):
     return pd.Series(rep).reindex(p.index)
 
 
+def restriction_kind(basis):
+    """가입 제한 근거 글을 제한 종류 하나로 줄인다. 같은 종류끼리만 한 단위로 묶는다."""
+    for k, pat in [("랩 · 특정금전신탁", "랩"), ("장기주택마련", "주택마련"), ("사원복지연기금", "사원복지"),
+                   ("계열사 자금", "계열사"), ("시드", "시드"), ("기관 · 법인 · 고액", "기관|고액|법인|I =")]:
+        if re.search(pat, basis):
+            return k
+    return basis
+
+
 def units(p):
-    """같은 펀드 + 같은 가입 구분. 원천 유형 · 속성 7개 · 투자전략 글이 다르면 합치지 않는다. unknown 은 상품마다 따로.
-    투자전략 글은 사실상 같으면 (same_text) 같은 글로 본다."""
-    p["_s"] = p.investment_strategy.map(lambda s: NOWS(str(s)))
-    p["_t"] = text_groups(p, dict(pl.BASE))
-    sig = p.product_type + "||" + p[ATTR7].astype(str).agg("|".join, axis=1) + "||" + p._t
+    """같은 펀드 + 같은 가입 구분 + 검색 문서에 들어가는 값 (투자유형 · 속성 6개 · 검색용 투자전략) 이 같으면 한 단위.
+    restricted 는 가입 제한 근거까지 같아야 하고, unknown 은 상품마다 따로 둔다 (11-17 팀원 최종 요청 4절)."""
+    p = product_strategy(p)
+    p["_inv"] = p.investment_type.fillna("(없음)")
+    p["_t"] = text_groups(p)
+    sig = p._inv + "||" + p[KEY_ATTR].astype(str).agg("|".join, axis=1) + "||" + p._t
     key = p.fund_key + "|" + p.account_type + "##" + sig
+    lim = p.account_type == "restricted"
+    key[lim] = key[lim] + "##" + p.account_type_basis[lim].map(restriction_kind)
     key[p.account_type == "unknown"] = "unknown##" + p.product_id[p.account_type == "unknown"]
     p["unit_key"] = key
-    funds_by_text = p.groupby("_s").fund_key.agg(set).to_dict()
-    opts = dict(pl.BASE)
     rows = []
     for uk, d in p.groupby("unit_key", sort=False):
-        r0 = d.loc[d._c.map(len).idxmax()]  # 글이 조금씩 다르면 가장 긴 정리본을 가진 상품의 글을 쓴다
-        raw = str(r0.investment_strategy).replace("_x000D_", "").replace("_x0002_", "-")
-        raw = re.sub(r"_x00[0-9A-Fa-f]{2}_", " ", raw)
-        clean = pl.merge_sentences([pl.clean_strategy(raw, opts)])
-        other = pl.manager_mismatch(raw, r0.fund_key) or bool(pl.owner_of(r0.fund_key, funds_by_text[r0._s] - {r0.fund_key}, raw))
-        old_side = "일반" if r0.account_type in ("general", "restricted") else "연금"  # 11-09 판의 연금 쪽 = pension · unknown
-        manual = f"{r0.fund_key}|{old_side}" in pl.MANUAL_EMPTY
-        if not raw.strip():
-            status, flag, strat = "missing", "원천 글 없음", ""
-        elif other or manual:
-            status, flag = "needs_review", ("손으로 확인: 남의 글" if manual else "다른 펀드의 글로 보임")
-            strat = raw  # 진우님 (11-17): 원천 글 그대로 (엑셀 코드만 지움) 넣고 needs_review 로 표시
-        elif not clean:
-            status, flag, strat = "needs_review", "경고문뿐", raw  # 원천 글 그대로
-        else:
-            status, flag, strat = "available", None, clean
+        r0 = d.loc[d.strategy_use.map(len).idxmax()]  # 글이 조금씩 다르면 가장 긴 글을 쓴다
+        sts = set(d.strategy_status)
+        status = next(s for s in ("available", "generated", "needs_review", "missing") if s in sts)
+        flags = sorted({f for f in d.strategy_flag if f})
+        loss = sorted({"최대 100%" if x == "100%" else x for x in d.loss_rate})  # "100%" 는 "최대 100%" 로 (11-17 진우님)
+        assert len(loss) == 1, (uk, loss)
         rows.append(dict(unit_key=uk, fund_id=r0.fund_id, fund_name=r0.fund_name, account_type=r0.account_type,
+                         restriction_kind=restriction_kind(r0.account_type_basis) if r0.account_type == "restricted" else None,
                          source_product_ids=list(d.product_id), class_list=sorted({c for c in d.share_class if c}),
                          n_products=len(d), product_type=r0.product_type, investment_type=r0.investment_type,
-                         risk_grade=r0.risk_grade_num, **{c: r0[c] for c in ATTR7 if c != "risk_grade"},
-                         strategy=strat, strategy_status=status, strategy_flag=flag))
+                         risk_grade=r0.risk_grade_num, risk_grade_raw=r0.risk_grade,
+                         **{c: r0[c] for c in KEY_ATTR if c != "risk_grade"}, loss_rate=loss[0],
+                         strategy=r0.strategy_use or None, strategy_status=status,
+                         strategy_flag=" / ".join(flags) if flags else None))
     u = pd.DataFrame(rows).sort_values(["fund_id", "account_type", "unit_key"]).reset_index(drop=True)
     u.insert(0, "unit_id", [f"U{i:05d}" for i in range(1, len(u) + 1)])
     p["unit_id"] = p.unit_key.map(dict(zip(u.unit_key, u.unit_id)))
-    return p.drop(columns=["_s", "_c", "_t"]), u
+    return p.drop(columns=["_c", "_t", "_inv"]), u
 
 
 def main():
@@ -201,7 +257,7 @@ def main():
     print("가입 구분 (단위)", u.account_type.value_counts().to_dict())
     print("클래스 상태", p.class_status.value_counts().to_dict())
     print("investment_type null", int(p.investment_type.isna().sum()))
-    print("strategy_status", u.strategy_status.value_counts().to_dict(), "| flag", u.strategy_flag.value_counts().to_dict())
+    print("strategy_status (단위)", u.strategy_status.value_counts().to_dict(), "| (상품)", p.strategy_status.value_counts().to_dict())
     print("단위 크기", u.n_products.value_counts().sort_index().to_dict())
 
 
