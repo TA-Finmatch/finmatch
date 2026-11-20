@@ -1,0 +1,30 @@
+{
+  "products": 7966,
+  "corpus": 3930,
+  "restored_products": 3,
+  "restored_questions": {
+    "validation": 5,
+    "test": 2
+  },
+  "strategy_status": {
+    "available": 3921,
+    "needs_review": 9
+  },
+  "identical_search_text_groups": 165,
+  "question_counts": {
+    "validation": 6400,
+    "test": 801
+  },
+  "reference_counts": {
+    "validation": {
+      "2": 4732,
+      "3": 1587,
+      "1": 81
+    },
+    "test": {
+      "3": 762,
+      "2": 34,
+      "1": 5
+    }
+  }
+}
