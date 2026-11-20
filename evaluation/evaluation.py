@@ -10,6 +10,7 @@
 - 같은 unit_id 가 결과에 여러 번 나오면 처음 것만 센다.
   뒤에 나온 중복은 순위 칸을 차지한 채 0점이다 (중복을 지우고 뒤를 당겨 오지 않는다).
   예: 정답 {A,B}, 결과 [A,A,B], k=3 이면 A 는 1위, B 는 3위.
+- Precision@k = (top-k 안의 정답 단위 수) / k. 결과가 k개보다 적어도 분모는 k다.
 - Recall@k = (top-k 안의 정답 단위 수) / (정답 단위 수).
   분모는 정답 수 그대로다. 정답이 k 보다 많으면 Recall@k 는 1 이 될 수 없다.
 - NDCG@k: 정답 관련도 1, 오답 0.
@@ -22,8 +23,8 @@
 
 사용
 ----
-python evaluation/evaluation.py --questions data/processed/v2/test.jsonl --predictions run.jsonl \
-    [--k 3] [--corpus data/processed/v2/corpus.jsonl] [--per-question out.csv] [--include-needs-review]
+python evaluation/evaluation.py --questions data/processed/v3/test.jsonl --predictions run.jsonl \
+    [--k 3] [--corpus data/processed/v3/corpus.jsonl] [--per-question out.csv] [--include-needs-review]
 python evaluation/evaluation.py --self-test
 """
 
@@ -48,6 +49,13 @@ def _top_k_hits(retrieved, relevant, k):
         seen.add(uid)
         rels.append(1 if uid in relevant else 0)
     return rels
+
+
+def precision_at_k(retrieved, relevant, k=3):
+    """Precision@k = top-k 안의 정답 수 / k."""
+    if k < 1:
+        raise ValueError("k 는 1 이상이어야 한다")
+    return sum(_top_k_hits(retrieved, set(relevant), k)) / k
 
 
 def recall_at_k(retrieved, relevant, k=3):
@@ -158,6 +166,7 @@ def evaluate(questions, predictions, k=3, corpus_ids=None,
             "in_predictions": in_predictions,
             "recall": recall_at_k(retrieved, relevant, k),
             "ndcg": ndcg_at_k(retrieved, relevant, k),
+            "precision": precision_at_k(retrieved, relevant, k),
         })
 
     # 질문 파일에 없는 question_id
@@ -187,9 +196,14 @@ def evaluate(questions, predictions, k=3, corpus_ids=None,
         "n_scored": n,
         "mean_recall": _mean(per_question, "recall"),
         "mean_ndcg": _mean(per_question, "ndcg"),
+        "mean_precision": _mean(per_question, "precision"),
         "by_query_type": {
-            t: {"n": len(rows), "mean_recall": _mean(rows, "recall"),
-                "mean_ndcg": _mean(rows, "ndcg")}
+            t: {
+                "n": len(rows),
+                "mean_recall": _mean(rows, "recall"),
+                "mean_ndcg": _mean(rows, "ndcg"),
+                "mean_precision": _mean(rows, "precision"),
+            }
             for t, rows in sorted(by_type.items())
         },
         "skipped_needs_review": skipped_needs_review,
@@ -240,9 +254,13 @@ def report(res, include_needs_review=False):
     print(f"채점한 질문 수: {res['n_scored']} (결과 없음 0점 {res['missing_predictions']}개 포함)")
     print(f"평균 Recall@{k}: {res['mean_recall']:.4f}")
     print(f"평균 NDCG@{k}:   {res['mean_ndcg']:.4f}")
+    print(f"평균 Precision@{k}: {res['mean_precision']:.4f}")
     print("query_type 별:")
     for t, v in res["by_query_type"].items():
-        print(f"  {t} (n={v['n']}): Recall@{k} {v['mean_recall']:.4f} · NDCG@{k} {v['mean_ndcg']:.4f}")
+        print(
+            f"  {t} (n={v['n']}): Recall@{k} {v['mean_recall']:.4f} · "
+            f"NDCG@{k} {v['mean_ndcg']:.4f} · Precision@{k} {v['mean_precision']:.4f}"
+        )
 
 
 def write_per_question_csv(res, path):
@@ -250,10 +268,11 @@ def write_per_question_csv(res, path):
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
         w.writerow(["question_id", "query_type", "n_reference", "in_predictions",
-                    f"recall@{k}", f"ndcg@{k}"])
+                    f"recall@{k}", f"ndcg@{k}", f"precision@{k}"])
         for r in res["per_question"]:
             w.writerow([r["question_id"], r["query_type"], r["n_reference"],
-                        int(r["in_predictions"]), f"{r['recall']:.6f}", f"{r['ndcg']:.6f}"])
+                        int(r["in_predictions"]), f"{r['recall']:.6f}", f"{r['ndcg']:.6f}",
+                        f"{r['precision']:.6f}"])
 
 
 # ── 손계산 시험 ────────────────────────────────────────────
@@ -283,6 +302,17 @@ def self_test():
         print(f"[{'통과' if good else '실패'}] {name}: Recall@{k}={r:.4f} (기대 {er:.4f}), "
               f"NDCG@{k}={n:.4f} (기대 {en:.4f})")
 
+    precision_cases = [
+        ("결과가 1개여도 분모는 3", ["A"], ["A"], 3, 1 / 3),
+        ("중복과 top-k 밖 정답 제외", ["A", "A", "B"], ["A", "B"], 2, 0.5),
+        ("빈 결과", [], ["A"], 3, 0.0),
+    ]
+    for name, ret, rel, k, expected in precision_cases:
+        precision = precision_at_k(ret, rel, k)
+        good = close(precision, expected)
+        ok &= good
+        print(f"[{'통과' if good else '실패'}] {name}: Precision@{k}={precision:.4f} (기대 {expected:.4f})")
+
     # evaluate() 전체 흐름: 결과 없음 0점 · needs_review 제외 · 모르는 id 경고
     qs = [
         {"question_id": "Q1", "reference_unit_ids": ["A", "B"], "mapping_status": "matched", "query_type": "t1"},
@@ -294,6 +324,13 @@ def self_test():
     checks = [
         ("채점 질문 수 2 (needs_review 1개 뺌)", res["n_scored"] == 2 and res["skipped_needs_review"] == 1),
         ("결과 없는 질문 1개, 평균 Recall 0.5", res["missing_predictions"] == 1 and close(res["mean_recall"], 0.5)),
+        ("평균 Precision 1/3, 질문별 Precision 2/3과 0",
+         close(res["mean_precision"], 1 / 3)
+         and close(res["per_question"][0]["precision"], 2 / 3)
+         and close(res["per_question"][1]["precision"], 0)),
+        ("질문 유형별 평균 Precision",
+         close(res["by_query_type"]["t1"]["mean_precision"], 2 / 3)
+         and close(res["by_query_type"]["t2"]["mean_precision"], 0)),
         ("모르는 question_id 1개", res["unknown_question_ids"] == ["Q9"]),
         ("corpus 에 없는 unit_id 1개", res["unknown_unit_ids"] == ["Z"]),
         ("t1 평균 NDCG 1.0, t2 평균 0.0",
@@ -313,7 +350,7 @@ def self_test():
 # ── 명령줄 ────────────────────────────────────────────────
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description="검색 결과를 unit_id 기준 Recall@k · NDCG@k 로 채점한다.")
+    p = argparse.ArgumentParser(description="검색 결과를 unit_id 기준 Precision@k · Recall@k · NDCG@k 로 채점한다.")
     p.add_argument("--questions", help="질문 JSONL (validation.jsonl / test.jsonl)")
     p.add_argument("--predictions", help="모델 결과 JSONL (question_id, retrieved_unit_ids)")
     p.add_argument("--k", type=int, default=3, help="top-k (기본 3)")
