@@ -1,0 +1,240 @@
+{
+    "dataset_counts": {
+        "corpus": 3930,
+        "products": 7966,
+        "validation": 6400
+    },
+    "schema": {
+        "corpus": [
+            "account_type",
+            "class_list",
+            "fund_id",
+            "fund_name",
+            "investment_type",
+            "liquidity_conditions",
+            "loss_rate",
+            "maturity_type",
+            "n_products",
+            "payment_type",
+            "product_type",
+            "protected_type",
+            "restriction_kind",
+            "risk_grade",
+            "search_text",
+            "source_product_ids",
+            "strategy",
+            "strategy_flag",
+            "strategy_status",
+            "tax_type",
+            "unit_id"
+        ],
+        "products": [
+            "account_type",
+            "account_type_basis",
+            "class_status",
+            "fund_id",
+            "fund_name",
+            "investment_type",
+            "product_id",
+            "share_class",
+            "source",
+            "source_locations",
+            "strategy_flag",
+            "strategy_status",
+            "unit_id"
+        ],
+        "validation": [
+            "cot_id",
+            "evaluation_role",
+            "mapping_status",
+            "query_type",
+            "question",
+            "question_id",
+            "question_raw",
+            "reference_product_ids",
+            "reference_product_names",
+            "reference_unit_ids",
+            "source_file",
+            "source_split",
+            "unresolved_product_names"
+        ]
+    },
+    "corpus_analysis": {
+        "text_length": {
+            "min": 132,
+            "max": 4058,
+            "mean": 869.63,
+            "median": 719.5
+        },
+        "empty_documents": 0,
+        "unique_texts": 3740,
+        "identical_text_groups": 165,
+        "identical_documents": 355
+    },
+    "question_analysis": {
+        "text_length": {
+            "min": 268,
+            "max": 674,
+            "mean": 404.18,
+            "median": 401.0
+        },
+        "empty_questions": 0,
+        "query_types": {
+            "상품 비교 추천형": 1908,
+            "투자성향 및 조건기반형": 2264,
+            "고객특성 강조형": 2228
+        }
+    },
+    "reference_analysis": {
+        "reference_counts": {
+            "2": 4732,
+            "3": 1587,
+            "1": 81
+        },
+        "mapping_status": {
+            "matched": 6400
+        }
+    },
+    "data_integrity": {
+        "duplicate_corpus_ids": 0,
+        "duplicate_question_ids": 0,
+        "unknown_reference_ids": [],
+        "unknown_product_unit_ids": []
+    },
+    "evaluation": {
+        "scored_questions": 6400,
+        "excluded_questions": 0,
+        "maximum_recall": {
+            "Recall@1": 0.465,
+            "Recall@3": 1.0,
+            "Recall@5": 1.0,
+            "Recall@10": 1.0
+        }
+    },
+    "samples": {
+        "corpus": [
+            {
+                "unit_id": "U00003",
+                "fund_id": "F0002",
+                "fund_name": "AB 미국 그로스 UH 증권투자신탁[주식-재간접]",
+                "account_type": "general",
+                "restriction_kind": null,
+                "source_product_ids": [
+                    "P00009",
+                    "P00010",
+                    "P00013",
+                    "P00014",
+                    "P00015",
+                    "P00016",
+                    "P00017"
+                ],
+                "class_list": [
+                    "A",
+                    "A-e",
+                    "C-e",
+                    "C1",
+                    "C2",
+                    "C3",
+                    "C4"
+                ],
+                "n_products": 7,
+                "product_type": "재간접",
+                "investment_type": "재간접",
+                "risk_grade": 2,
+                "protected_type": "원금 비보장형",
+                "maturity_type": "만기 없음",
+                "tax_type": "무",
+                "payment_type": "추가납입",
+                "liquidity_conditions": "중도해지 가능",
+                "loss_rate": "최대 100%",
+                "strategy": "얼라이언스번스틴자산운용(주)는 이 투자신탁의 투자위험 등급을 실제 수익률 변동성을 감안하여 2 등급으로 분류하였습니다. 집합투자증권은 예금자보호법에 따라 보호되지 않는 실적배당상품이며, 집합투자기구는 미국 발행인의 주식에 주로 투자하는 해외집합투자기구를 주된 투자대상으로 하며, 주식 위험, 파생상품 위험, 환위험, 유동성 위험, 집중포트폴리오 위험 등에 노출될 수 있으므로 투자에 신중을 기하여 주시기 바랍니다. 투자목적 및 투자전략 이 집합투자기구는 미국 발행인의 주식에 주로 투자하는 해외 집합투자기구인 AB SICAV I – 아메리칸 성장형 포트폴리오(‘피투자펀드’)를 주된 투자대상으로 하여 투자함으로써 자본성장을 통하여 시간이 지남에 따라 투자자의 투자자산 가치를 상승시키는 것을 추구합니다. 피투자펀드 운용자는 이 피투자펀드를 적극적으로 운용함에 있어 미국 대기업들에 집중합니다. 피투자펀드 운용자는 우량한 품질과 우수한 장기 성장 특성을 가지는 것으로 운용자가 판단하는 증권들로 구성되는 비교적 집중적이고 확신도가 높은 포트폴리오(주로 40~60개 회사들로 구성)를 구축하기 위하여 근본적인 리서치를 사용합니다(상향식 접근법). 분류 - 투자신탁, 증권(재간접형), 개방형, 추가형, 종류형 - 고난도금융투자상품 해당 여부: 해당 없음",
+                "strategy_status": "available",
+                "strategy_flag": null,
+                "search_text": "상품명: AB 미국 그로스 UH 증권투자신탁[주식-재간접]. 가입 구분: 일반. 투자유형: 재간접. 위험등급: 2등급(높은위험). 원금보장 여부: 원금 비보장형. 만기: 만기 없음. 세제혜택: 무. 납입 방식: 추가납입. 유동성: 중도해지 가능. 투자전략: 얼라이언스번스틴자산운용(주)는 이 투자신탁의 투자위험 등급을 실제 수익률 변동성을 감안하여 2 등급으로 분류하였습니다. 집합투자증권은 예금자보호법에 따라 보호되지 않는 실적배당상품이며, 집합투자기구는 미국 발행인의 주식에 주로 투자하는 해외집합투자기구를 주된 투자대상으로 하며, 주식 위험, 파생상품 위험, 환위험, 유동성 위험, 집중포트폴리오 위험 등에 노출될 수 있으므로 투자에 신중을 기하여 주시기 바랍니다. 투자목적 및 투자전략 이 집합투자기구는 미국 발행인의 주식에 주로 투자하는 해외 집합투자기구인 AB SICAV I – 아메리칸 성장형 포트폴리오(‘피투자펀드’)를 주된 투자대상으로 하여 투자함으로써 자본성장을 통하여 시간이 지남에 따라 투자자의 투자자산 가치를 상승시키는 것을 추구합니다. 피투자펀드 운용자는 이 피투자펀드를 적극적으로 운용함에 있어 미국 대기업들에 집중합니다. 피투자펀드 운용자는 우량한 품질과 우수한 장기 성장 특성을 가지는 것으로 운용자가 판단하는 증권들로 구성되는 비교적 집중적이고 확신도가 높은 포트폴리오(주로 40~60개 회사들로 구성)를 구축하기 위하여 근본적인 리서치를 사용합니다(상향식 접근법). 분류 - 투자신탁, 증권(재간접형), 개방형, 추가형, 종류형 - 고난도금융투자상품 해당 여부: 해당 없음."
+            },
+            {
+                "unit_id": "U00004",
+                "fund_id": "F0002",
+                "fund_name": "AB 미국 그로스 UH 증권투자신탁[주식-재간접]",
+                "account_type": "pension",
+                "restriction_kind": null,
+                "source_product_ids": [
+                    "P00011",
+                    "P00012",
+                    "P00018",
+                    "P00019"
+                ],
+                "class_list": [
+                    "C-P",
+                    "C-P2",
+                    "Ce-P",
+                    "Ce-P2"
+                ],
+                "n_products": 4,
+                "product_type": "퇴직연금",
+                "investment_type": null,
+                "risk_grade": 2,
+                "protected_type": "원금 비보장형",
+                "maturity_type": "만기 없음",
+                "tax_type": "유",
+                "payment_type": "추가납입",
+                "liquidity_conditions": "중도해지 가능",
+                "loss_rate": "최대 100%",
+                "strategy": "이 집합투자기구는 미국 발행인의 주식에 주로 투자하는 해외 집합투자기구인 AB SICAV I – 아메리칸 성장형 포트폴리오(‘피투자펀드’)를 주된 투자대상으로 하여 투자함으로써 자본성장을 통하여 시간이 지남에 따라 투자자의 투자자산 가치를 상승시키는 것을 추구합니다. 피투자펀드 운용자는 이 피투자펀드를 적극적으로 운용함에 있어 미국 대기업들에 집중합니다. 피투자펀드 운용자는 우량한 품질과 우수한 장기 성장 특성을 가지는 것으로 운용자가 판단하는 증권들로 구성되는 비교적 집중적이고 확신도가 높은 포트폴리오(주로 40~60개 회사들로 구성)를 구축하기 위하여 근본적인 리서치를 사용합니다(상향식 접근법)",
+                "strategy_status": "available",
+                "strategy_flag": null,
+                "search_text": "상품명: AB 미국 그로스 UH 증권투자신탁[주식-재간접]. 가입 구분: 연금. 위험등급: 2등급(높은위험). 원금보장 여부: 원금 비보장형. 만기: 만기 없음. 세제혜택: 유. 납입 방식: 추가납입. 유동성: 중도해지 가능. 투자전략: 이 집합투자기구는 미국 발행인의 주식에 주로 투자하는 해외 집합투자기구인 AB SICAV I – 아메리칸 성장형 포트폴리오(‘피투자펀드’)를 주된 투자대상으로 하여 투자함으로써 자본성장을 통하여 시간이 지남에 따라 투자자의 투자자산 가치를 상승시키는 것을 추구합니다. 피투자펀드 운용자는 이 피투자펀드를 적극적으로 운용함에 있어 미국 대기업들에 집중합니다. 피투자펀드 운용자는 우량한 품질과 우수한 장기 성장 특성을 가지는 것으로 운용자가 판단하는 증권들로 구성되는 비교적 집중적이고 확신도가 높은 포트폴리오(주로 40~60개 회사들로 구성)를 구축하기 위하여 근본적인 리서치를 사용합니다(상향식 접근법)."
+            }
+        ],
+        "questions": [
+            {
+                "question_id": "TR-00001",
+                "cot_id": 1,
+                "source_split": "Training",
+                "source_file": "증권_03_00001.json",
+                "evaluation_role": "development_validation",
+                "query_type": "상품 비교 추천형",
+                "question_raw": "저는 50대 남성으로 약 8천만 원의 자산을 보유하고 있고, 현재는 자영업에 종사하고 있습니다. 은퇴 이후에도 자산 증식을 목표로, 기존에 안정적인 상품 위주로 운용하다가 최근에는 좀 더 적극적으로 국내 증시에 참여해볼 생각을 하고 있습니다. 투자금은 5천만 원 정도를 고려하고 있는데, 만기 제한이 없으면서도 필요시 중도 환매가 가능한 상품을 선호합니다. 단기적인 변동성이나 원금 손실 가능성도 감내할 수 있으며, 시장의 높은 등락에도 경험적으로 대응할 의사가 있습니다. 주로 성장성이 뛰어난 우량 중소기업 투자 기회를 찾거나, 시장 상승기에 레버리지 효과 등 보다 공격적인 전략을 활용하는 상품에도 관심이 있는데, 이런 조건에서 주식형 상품과 파생형 상품군의 주요 차이점과 저의 목표에 더 적합한 유형이 무엇인지 추천해주실 수 있을까요?",
+                "question": "저는 50대 남성으로 약 8천만 원의 자산을 보유하고 있고, 현재는 자영업에 종사하고 있습니다. 은퇴 이후에도 자산 증식을 목표로, 기존에 안정적인 상품 위주로 운용하다가 최근에는 좀 더 적극적으로 국내 증시에 참여해볼 생각을 하고 있습니다. 투자금은 5천만 원 정도를 고려하고 있는데, 만기 제한이 없으면서도 필요시 중도 환매가 가능한 상품을 선호합니다. 단기적인 변동성이나 원금 손실 가능성도 감내할 수 있으며, 시장의 높은 등락에도 경험적으로 대응할 의사가 있습니다. 주로 성장성이 뛰어난 우량 중소기업 투자 기회를 찾거나, 시장 상승기에 레버리지 효과 등 보다 공격적인 전략을 활용하는 상품에도 관심이 있는데, 이런 조건에서 주식형 상품과 파생형 상품군의 주요 차이점과 저의 목표에 더 적합한 유형이 무엇인지 추천해주실 수 있을까요?",
+                "reference_product_names": [
+                    "현대강소기업증권자투자신탁1호[주식](C3)",
+                    "NH-Amundi 코리아 2배 레버리지 증권투자신탁[주식-파생형](Cw)"
+                ],
+                "reference_product_ids": [
+                    "P07839",
+                    "P01359"
+                ],
+                "reference_unit_ids": [
+                    "U03798",
+                    "U00600"
+                ],
+                "unresolved_product_names": [],
+                "mapping_status": "matched"
+            },
+            {
+                "question_id": "TR-00002",
+                "cot_id": 2,
+                "source_split": "Training",
+                "source_file": "증권_02_00002.json",
+                "evaluation_role": "development_validation",
+                "query_type": "투자성향 및 조건기반형",
+                "question_raw": "저는 40대 남성으로 약 1억 5천만 원의 자산을 보유하고 있으며, 공격투자형 투자성향을 가지고 있습니다. 현재는 주로 국내 재간접형과 고위험 성격의 상품에 투자해 온 경험이 있습니다. 최근에는 자산 증식과 은퇴자금 마련을 동시에 염두에 두고 해외 시장, 특히 중남미 지역 기업의 주식이나 에너지 인프라와 관련된 자산에 관심을 갖게 되었습니다. 투자기간엔 제약이 없고, 시장의 성장성에 따라 적극적으로 주가상승과 배당 등 다양한 수익 실현 기회를 얻고 싶습니다. 다만, 투자 중에도 필요시 자금을 중도 환매할 수 있는 유동성 또한 중요하게 여기고 있습니다. 공격적인 투자성향에 적합하면서, 신흥시장 및 에너지 인프라 자산 중심으로 포트폴리오 다각화가 가능한 상품이 있다면 추천해 주실 수 있을까요?",
+                "question": "저는 40대 남성으로 약 1억 5천만 원의 자산을 보유하고 있으며, 공격투자형 투자성향을 가지고 있습니다. 현재는 주로 국내 재간접형과 고위험 성격의 상품에 투자해 온 경험이 있습니다. 최근에는 자산 증식과 은퇴자금 마련을 동시에 염두에 두고 해외 시장, 특히 중남미 지역 기업의 주식이나 에너지 인프라와 관련된 자산에 관심을 갖게 되었습니다. 투자기간엔 제약이 없고, 시장의 성장성에 따라 적극적으로 주가상승과 배당 등 다양한 수익 실현 기회를 얻고 싶습니다. 다만, 투자 중에도 필요시 자금을 중도 환매할 수 있는 유동성 또한 중요하게 여기고 있습니다. 공격적인 투자성향에 적합하면서, 신흥시장 및 에너지 인프라 자산 중심으로 포트폴리오 다각화가 가능한 상품이 있다면 추천해 주실 수 있을까요?",
+                "reference_product_names": [
+                    "한화중남미증권 자투자신탁(주식-재간접)(A)",
+                    "한화 에너지인프라MLP특별자산 자투자회사(인프라-재간접)(신탁)"
+                ],
+                "reference_product_ids": [
+                    "P07767",
+                    "P07543"
+                ],
+                "reference_unit_ids": [
+                    "U03766",
+                    "U03744"
+                ],
+                "unresolved_product_names": [],
+                "mapping_status": "matched"
+            }
+        ]
+    }
+}
