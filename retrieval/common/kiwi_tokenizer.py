@@ -12,6 +12,10 @@ TF-IDF · BM25 · LSA · LDA · NMF · Word2Vec 처럼 낱말을 직접 세거�
 ------------------
 1. 문자 모양 통일: 유니코드 NFKC, 줄바꿈 · 탭 · 연속 공백은 공백 하나로. 빈 값 (None, 파이썬 float 의 NaN) 은 빈 글.
    pandas 의 `pd.NA` 나 numpy float32 의 NaN 은 처리하지 않는다 (넣기 전에 `fillna("")` 를 한다).
+   단 한글 자음 · 모음 기호 (ㄱ ~ ㆎ, U+3131 ~ U+318E) 는 NFKC 에서 뺀다. NFKC 는 이 기호를 첫소리 · 가운뎃소리
+   조각으로 바꾸는데, 그러면 가운뎃점 대신 쓴 "ㆍ" 때문에 "기관ㆍ법인ㆍ고액" 이 한 낱말로 붙고,
+   글머리표 "ㅇ" 이 낱말로 남는다. 그대로 두면 Kiwi 가 기호 (SW) 로 보고 버린다.
+   원문에 처음부터 옛 모음 조각 "ᆞ" (U+119E) 를 가운뎃점으로 쓴 곳 ("국내ᆞ외") 도 있어서, "ᆞ" 와 "ㆍ" 는 가운뎃점 "·" 으로 바꾼다.
 2. `search_text` 의 틀 이름표 지우기: "상품명: ", "가입 구분: ", "위험등급: " 처럼 모든 상품 글에 같은 자리에
    들어간 이름표 10개 (`TEMPLATE_LABELS`) 를 지운다. 이름표 뒤의 값 ("2등급(높은위험)") 은 남는다.
    이름표가 남으면 3,930개 글 전부에 같은 낱말이 생겨 LDA · Word2Vec 이 그 낱말에 끌려간다.
@@ -89,6 +93,7 @@ SPACED_UNITS = ("년", "개월", "월", "일", "주", "등급", "%", "원", "만
 _USER_MAXLEN = 4                   # 사용자 사전 낱말을 이어 붙일 때 볼 조각 수
 
 _USER_SET = set(USER_WORDS)
+_COMPAT_JAMO_RE = re.compile(r"([\u3131-\u318E]+)")   # 한글 자음 · 모음 기호. NFKC 에서 뺀다
 _LABEL_RE = re.compile(r"(?:^|(?<=\. ))(?:" + "|".join(re.escape(x) for x in TEMPLATE_LABELS) + r"): ")
 _kiwi = None
 
@@ -111,7 +116,10 @@ def normalize(text):
     """문자 모양을 통일하고 search_text 의 틀 이름표를 지운다."""
     if text is None or (isinstance(text, float) and math.isnan(text)):
         return ""
-    text = unicodedata.normalize("NFKC", str(text))
+    # 한글 자음 · 모음 기호 덩어리는 그대로 두고, 나머지 조각만 NFKC 로 바꾼다 (split 의 홀수 번째가 기호 덩어리)
+    text = str(text).replace("\u119e", "\u00b7").replace("\u318d", "\u00b7")   # 가운뎃점으로 쓴 "ᆞ" · "ㆍ" → "·"
+    parts = _COMPAT_JAMO_RE.split(text)
+    text = "".join(p if k % 2 else unicodedata.normalize("NFKC", p) for k, p in enumerate(parts))
     text = " ".join(text.split())
     return _LABEL_RE.sub("", text)
 
@@ -225,6 +233,10 @@ def self_test(verbose=True):
         ("영어 약어 뒤 형", "MMF형 상품", ["mmf형", "상품"]),
         ("빈 값", float("nan"), []),
         ("문자 모양 통일 (전각 숫자)", "２등급", ["2등급"]),
+        ("가운뎃점 대신 쓴 'ㆍ' 는 NFKC 에서 빼서 낱말이 붙지 않음", "기관ㆍ법인ㆍ고액", ["기관", "법인", "고액"]),
+        ("원문의 옛 모음 조각 'ᆞ' 도 가운뎃점 '·' 과 같게 (Kiwi 는 '국내·외' 를 한 낱말로 본다)", "국내\u119e외 지속적\u119e주기적", ["국내·외", "지속", "주기"]),
+        ("글머리표 'ㅇ' 은 버림", "ㅇ 투자전략 안내", ["투자", "전략", "안내"]),
+        ("자모로 쪼개 저장된 한글은 NFKC 로 합침", "\u1112\u1161\u11ab\u1100\u116e\u11a8 펀드", ["한국", "펀드"]),
     ]
     ok = True
     for label, text, want in cases:
