@@ -4,3 +4,4 @@ scipy 1.18.1
 scikit-learn 1.9.1
 kiwipiepy 0.22.2
 kiwipiepy_model 0.22.1
+tokenizer retrieval/common/kiwi_tokenizer.py config_id=5d8bb7424b

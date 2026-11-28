@@ -2,10 +2,13 @@
 
 규칙 요약
 - 검색 후보: corpus.jsonl 3,930개 전체, 상품 필터 없음.
-- 입력: 질문의 `question`. `reference_unit_ids` 는 채점에서만 쓴다 (이 파일은 읽지도 않는다).
-- TF-IDF 는 corpus 의 `search_text` 에만 fit 하고, 질문은 같은 토크나이저 · 같은 벡터화기로 변환한다.
+- 입력: 질문의 `question`. `reference_unit_ids` 는 채점에서만 쓴다 (검색 함수는 읽지도 않는다).
+- 토큰화: 팀 공통 모듈 retrieval/common/kiwi_tokenizer.py 를 그대로 쓴다 (규칙은 거기서만 바꾼다).
+  문서 (`search_text`) 와 질문 (`question`) 을 같은 함수로 자른다.
+- TF-IDF 는 corpus 의 `search_text` 에만 fit 하고, 질문은 같은 벡터화기로 변환만 한다.
 - 출력: 질문마다 서로 다른 unit_id 상위 3개. 한 줄에 {"question_id", "retrieved_unit_ids"}.
 - 설정은 validation 의 NDCG@3 으로만 고른다. test 는 `final` 로 설정을 고정한 뒤 한 번만 돌린다.
+- 두 모델: "TF-IDF" (n-gram 1 ~ 1) 와 "TF-IDF + N-gram" (n-gram 1 ~ 2, 3, 4).
 
 사용 (저장소 루트에서)
     python retrieval/tfidf/tfidf.py grid     # validation 에서 설정 탐색 → results/tfidf/
@@ -25,18 +28,15 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "evaluation"))
+sys.path.insert(0, str(ROOT / "retrieval" / "common"))
 import evaluation as ev  # noqa: E402  공통 평가 코드 (팀 공용)
+import kiwi_tokenizer as kt  # noqa: E402  공통 토큰화 (팀 공용)
 
 DATA = ROOT / "data" / "processed" / "v3"
 OUT = ROOT / "results" / "tfidf"
-CACHE = ROOT / "scratch" / "tfidf_tokens.json"  # scratch/ 는 .gitignore 대상
+CACHE_DIR = ROOT / "scratch" / "cache" / "tokens"  # scratch/ 는 .gitignore 대상
 K = 3
 SLUG = {"TF-IDF": "tfidf", "TF-IDF + N-gram": "tfidf-ngram"}  # Notion 이 요구하는 두 모델 → 파일 이름 앞부분
-
-# 품사 필터 (Kiwi 태그). 'all' 은 문장부호 · 기호만 뺀다.
-PUNCT = {"SF", "SP", "SS", "SSO", "SSC", "SE", "SO", "SW"}
-NOUN = {"NNG", "NNP", "SL", "SN"}
-CONTENT = NOUN | {"VV", "VA", "XR"}
 
 
 # ── 입출력 ──────────────────────────────────────────────────
@@ -52,73 +52,52 @@ def load_all():
     return corpus, val, test
 
 
-# ── 토큰화 (Kiwi, 한 번만 돌려 캐시) ─────────────────────────
-def kiwi_tokens(texts):
-    from kiwipiepy import Kiwi
-
-    kiwi = Kiwi()
-    out = []
-    for toks in kiwi.tokenize(texts):
-        out.append([[t.form, t.tag] for t in toks])
-    return out
-
-
-def kiwipiepy_version():
-    from importlib.metadata import version
-
-    return version("kiwipiepy")
-
-
 def write_environment():
-    """실행 환경 (Python · 라이브러리 버전) 을 results/tfidf/environment.txt 에 남긴다."""
+    """실행 환경과 토큰화 규칙의 지문을 results/tfidf/environment.txt 에 남긴다."""
     import platform
     from importlib.metadata import version
 
     OUT.mkdir(parents=True, exist_ok=True)
     lines = [f"python {platform.python_version()}"]
     lines += [f"{p} {version(p)}" for p in ("numpy", "scipy", "scikit-learn", "kiwipiepy", "kiwipiepy_model")]
+    lines.append(f"tokenizer retrieval/common/kiwi_tokenizer.py config_id={kt.config_id()}")
     (OUT / "environment.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def get_tokenized(corpus, val, test):
-    """{'corpus': [...], 'validation': [...], 'test': [...]} 각 문서는 [[form, tag], ...].
+# ── 토큰화 (팀 공통 모듈) ────────────────────────────────────
+def get_tokens(corpus, val, test):
+    """문서와 질문을 공통 토크나이저로 잘라 낱말 목록 (글마다 list[str]) 으로 돌려준다.
 
-    캐시는 kiwipiepy 버전이 같을 때만 쓴다 (버전이 다르면 토큰이 달라질 수 있다).
+    공통 토크나이저는 Kiwi 사전에 있는 여러 낱말짜리 이름 ("스탠더드 앤드 푸어스") 을 토큰 하나로 낼 때가 있다
+    (corpus 에서 20번). 토큰을 공백으로 이었다가 다시 나누면 이런 토큰이 쪼개져 공통 토큰화의 결과가 바뀐다.
+    그래서 목록을 그대로 벡터화기에 넣고, n-gram 만 아래 ngram_analyzer 가 만든다.
     """
-    if CACHE.exists():
-        with open(CACHE, encoding="utf-8") as f:
-            cached = json.load(f)
-        if (cached.get("kiwipiepy") == kiwipiepy_version()
-                and len(cached["corpus"]) == len(corpus) and len(cached["validation"]) == len(val)
-                and len(cached["test"]) == len(test)):
-            return cached
-    t0 = time.time()
-    res = {
-        "kiwipiepy": kiwipiepy_version(),
-        "corpus": kiwi_tokens([d["search_text"] for d in corpus]),
-        "validation": kiwi_tokens([q["question"] for q in val]),
-        "test": kiwi_tokens([q["question"] for q in test]),
+    def cut(name, texts):
+        return kt.tokenize_all(texts, cache_dir=CACHE_DIR, name=name)
+
+    return {
+        "corpus": cut("corpus", [d["search_text"] for d in corpus]),
+        "validation": cut("validation", [q["question"] for q in val]),
+        "test": cut("test", [q["question"] for q in test]),
     }
-    CACHE.parent.mkdir(parents=True, exist_ok=True)
-    with open(CACHE, "w", encoding="utf-8") as f:
-        json.dump(res, f, ensure_ascii=False)
-    print(f"Kiwi 토큰화 {time.time() - t0:.0f}s → {CACHE}")
-    return res
-
-
-def keep(tokens, pos):
-    if pos == "all":
-        return " ".join(f for f, t in tokens if t not in PUNCT)
-    allowed = NOUN if pos == "noun" else CONTENT
-    return " ".join(f for f, t in tokens if t in allowed)
 
 
 # ── 설정 ────────────────────────────────────────────────────
+def ngram_analyzer(lo, hi):
+    """이미 자른 토큰 목록에서 lo ~ hi 개씩 이어진 낱말 묶음을 만든다 (scikit-learn 의 ngram_range 와 같은 방식:
+    묶음 안 낱말은 공백으로 잇는다). analyzer 가 함수이면 ngram_range 는 무시되므로 직접 만든다."""
+    def analyze(tokens):
+        out = []
+        for n in range(lo, hi + 1):
+            out.extend(" ".join(tokens[i:i + n]) for i in range(len(tokens) - n + 1))
+        return out
+    return analyze
+
+
 def make_vectorizer(cfg):
-    common = dict(sublinear_tf=cfg["sublinear"], max_df=cfg["max_df"], min_df=cfg["min_df"],
-                  ngram_range=tuple(cfg["ngram"]))
-    # 토큰이 이미 공백으로 이어진 글이므로 공백으로 나눈다
-    return TfidfVectorizer(tokenizer=str.split, token_pattern=None, lowercase=True, **common)
+    # 토큰은 공통 토크나이저가 이미 정했으므로 그대로 쓴다 (소문자 · 불용어 처리 등을 더 하지 않는다)
+    return TfidfVectorizer(analyzer=ngram_analyzer(*cfg["ngram"]),
+                           sublinear_tf=cfg["sublinear"], max_df=cfg["max_df"], min_df=cfg["min_df"])
 
 
 def family(cfg):
@@ -127,16 +106,8 @@ def family(cfg):
 
 
 def describe(cfg):
-    return (f"Kiwi({cfg['pos']}), ngram={tuple(cfg['ngram'])}, sublinear_tf={cfg['sublinear']}, "
+    return (f"shared Kiwi tokenizer, ngram={tuple(cfg['ngram'])}, sublinear_tf={cfg['sublinear']}, "
             f"max_df={cfg['max_df']}, min_df={cfg['min_df']}")
-
-
-def texts_for(cfg, tokenized, corpus, val, test):
-    """(문서 글, {'validation': 질문 글, 'test': 질문 글}) — 문서와 질문을 같은 방식으로 만든다."""
-    p = cfg["pos"]
-    return ([keep(t, p) for t in tokenized["corpus"]],
-            {"validation": [keep(t, p) for t in tokenized["validation"]],
-             "test": [keep(t, p) for t in tokenized["test"]]})
 
 
 # ── 검색 ────────────────────────────────────────────────────
@@ -154,11 +125,11 @@ def rank_top_k(vec, doc_texts, query_texts, unit_ids, k=K, chunk=500):
 
 
 def predict(cfg, split, data):
-    corpus, val, test, tokenized = data
-    docs, queries = texts_for(cfg, tokenized, corpus, val, test)
+    """{question_id: [상위 3 unit_id]}. 질문 글 (question) 만 쓰고 정답 필드는 읽지 않는다."""
+    corpus, val, test, texts = data
     unit_ids = [d["unit_id"] for d in corpus]
     qs = val if split == "validation" else test
-    ranked = rank_top_k(make_vectorizer(cfg), docs, queries[split], unit_ids)
+    ranked = rank_top_k(make_vectorizer(cfg), texts["corpus"], texts[split], unit_ids)
     return {q["question_id"]: r for q, r in zip(qs, ranked)}
 
 
@@ -176,66 +147,28 @@ def write_preds(path, preds, questions):
 
 # ── 설정 탐색 (validation 만) ───────────────────────────────
 def grid_configs():
-    cfgs = []
-    for pos, ng, sub, mdf in itertools.product(
-            ["all", "content", "noun"], [(1, 1), (1, 2), (1, 3)], [False, True], [1.0, 0.5]):
-        cfgs.append(dict(analyzer="word", pos=pos, ngram=list(ng), sublinear=sub, max_df=mdf, min_df=1))
-    return cfgs
+    """n-gram 범위 (1-1 이 'TF-IDF', 나머지가 'TF-IDF + N-gram') x sublinear_tf x max_df x min_df = 64개."""
+    return [dict(ngram=list(ng), sublinear=sub, max_df=mdf, min_df=mn)
+            for ng, sub, mdf, mn in itertools.product(
+                [(1, 1), (1, 2), (1, 3), (1, 4)], [False, True], [1.0, 0.5, 0.3, 0.1], [1, 2])]
 
 
-def refine_configs():
-    """2차 탐색: 1차 최고 설정이 격자 끝 (max_df 0.5, ngram 1-3) 이라 그 너머를 더 본다."""
-    cfgs = []
-    for pos, ng, sub, mdf, mn in itertools.product(
-            ["noun", "content"], [(1, 1), (1, 2), (1, 3), (1, 4)], [False, True], [0.5, 0.3, 0.1], [1, 2]):
-        cfgs.append(dict(analyzer="word", pos=pos, ngram=list(ng), sublinear=sub, max_df=mdf, min_df=mn))
-    return cfgs
-
-
-def cfg_key(c):
-    return (c["analyzer"], c["pos"], tuple(c["ngram"]), c["sublinear"], c["max_df"], c["min_df"])
-
-
-def load_prior():
-    """이미 저장된 grid_validation.csv 의 결과를 (행, 설정) 으로 되살린다 (stage 칸이 없으면 1차)."""
-    path = OUT / "grid_validation.csv"
-    if not path.exists():
-        return []
-    prior = []
-    with open(path, newline="", encoding="utf-8-sig") as f:
-        for r in csv.DictReader(f):
-            lo, hi = r["ngram"].split("-")
-            cfg = dict(analyzer=r["analyzer"], pos=r["pos"] or None, ngram=[int(lo), int(hi)],
-                       sublinear=r["sublinear_tf"] == "True", max_df=float(r["max_df"]),
-                       min_df=int(r["min_df"]))
-            row = dict(family=r["family"], analyzer=r["analyzer"], pos=r["pos"], ngram=r["ngram"],
-                       sublinear_tf=cfg["sublinear"], max_df=cfg["max_df"], min_df=cfg["min_df"],
-                       precision3=float(r["precision3"]), recall3=float(r["recall3"]),
-                       ndcg3=float(r["ndcg3"]), stage=int(r.get("stage") or 1))
-            prior.append((row, cfg))
-    return prior
-
-
-def cmd_grid(args):
+def cmd_grid(_args):
     write_environment()
     corpus, val, test = load_all()
-    tokenized = get_tokenized(corpus, val, test)
-    data = (corpus, val, test, tokenized)
+    data = (corpus, val, test, get_tokens(corpus, val, test))
     corpus_ids = {d["unit_id"] for d in corpus}
 
-    rows = load_prior() if args.stage == 2 else []
-    done = {cfg_key(c) for _, c in rows}
-    cfgs = [c for c in (grid_configs() if args.stage == 1 else refine_configs()) if cfg_key(c) not in done]
+    rows = []
+    cfgs = grid_configs()
     for i, cfg in enumerate(cfgs, 1):
         t0 = time.time()
         res = score(predict(cfg, "validation", data), val, corpus_ids)
-        row = dict(family=family(cfg), analyzer=cfg["analyzer"], pos=cfg["pos"] or "",
-                   ngram=f"{cfg['ngram'][0]}-{cfg['ngram'][1]}", sublinear_tf=cfg["sublinear"],
-                   max_df=cfg["max_df"], min_df=cfg["min_df"],
-                   precision3=res["mean_precision"], recall3=res["mean_recall"], ndcg3=res["mean_ndcg"],
-                   stage=args.stage)
+        row = dict(family=family(cfg), ngram=f"{cfg['ngram'][0]}-{cfg['ngram'][1]}",
+                   sublinear_tf=cfg["sublinear"], max_df=cfg["max_df"], min_df=cfg["min_df"],
+                   precision3=res["mean_precision"], recall3=res["mean_recall"], ndcg3=res["mean_ndcg"])
         rows.append((row, cfg))
-        print(f"[{i:2d}/{len(cfgs)}] {row['family']:<22} {describe(cfg):<70} "
+        print(f"[{i:2d}/{len(cfgs)}] {row['family']:<16} {describe(cfg):<95} "
               f"P@3={row['precision3']:.4f} R@3={row['recall3']:.4f} NDCG@3={row['ndcg3']:.4f} "
               f"({time.time() - t0:.1f}s)", flush=True)
 
@@ -247,8 +180,7 @@ def cmd_grid(args):
 
     best = {}
     for fam in SLUG:
-        cands = [(r, c) for r, c in rows if r["family"] == fam]
-        r, c = max(cands, key=lambda rc: rc[0]["ndcg3"])  # 선택 기준: validation NDCG@3
+        r, c = max(((r, c) for r, c in rows if r["family"] == fam), key=lambda rc: rc[0]["ndcg3"])  # 선택 기준: validation NDCG@3
         best[fam] = dict(config=c, validation=dict(precision3=r["precision3"], recall3=r["recall3"],
                                                    ndcg3=r["ndcg3"]))
     with open(OUT / "best_configs.json", "w", encoding="utf-8") as f:
@@ -258,8 +190,7 @@ def cmd_grid(args):
     print("Model | Key settings | Precision@3 | Recall@3 | NDCG@3")
     for fam, b in best.items():
         v = b["validation"]
-        slug = SLUG[fam]
-        write_preds(OUT / f"{slug}-validation.jsonl", predict(b["config"], "validation", data), val)
+        write_preds(OUT / f"{SLUG[fam]}-validation.jsonl", predict(b["config"], "validation", data), val)
         print(f"{fam} | {describe(b['config'])} | {v['precision3']:.4f} | {v['recall3']:.4f} | {v['ndcg3']:.4f}")
 
 
@@ -272,19 +203,16 @@ def cmd_final(_args):
         best = json.load(f)
     write_environment()
     corpus, val, test = load_all()
-    data = (corpus, val, test, get_tokenized(corpus, val, test))
+    data = (corpus, val, test, get_tokens(corpus, val, test))
     for fam, b in best.items():
-        slug = SLUG[fam]
-        write_preds(OUT / f"{slug}-test.jsonl", predict(b["config"], "test", data), test)
-        print(f"쓴 파일: {OUT / (slug + '-test.jsonl')}")
+        write_preds(OUT / f"{SLUG[fam]}-test.jsonl", predict(b["config"], "test", data), test)
+        print(f"쓴 파일: {OUT / (SLUG[fam] + '-test.jsonl')}")
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
-    g = sub.add_parser("grid", help="validation 에서 설정 탐색 (--stage 2 는 1차 결과에 이어 세부 탐색)")
-    g.add_argument("--stage", type=int, choices=[1, 2], default=1)
-    g.set_defaults(fn=cmd_grid)
+    sub.add_parser("grid", help="validation 에서 설정 탐색").set_defaults(fn=cmd_grid)
     sub.add_parser("final", help="고정한 설정으로 test 결과 JSONL 생성").set_defaults(fn=cmd_final)
     args = p.parse_args()
     args.fn(args)
