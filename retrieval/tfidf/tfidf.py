@@ -31,6 +31,7 @@ DATA = ROOT / "data" / "processed" / "v3"
 OUT = ROOT / "results" / "tfidf"
 CACHE = ROOT / "scratch" / "tfidf_tokens.json"  # scratch/ 는 .gitignore 대상
 K = 3
+SLUG = {"TF-IDF": "tfidf", "TF-IDF + N-gram": "tfidf-ngram"}  # Notion 이 요구하는 두 모델 → 파일 이름 앞부분
 
 # 품사 필터 (Kiwi 태그). 'all' 은 문장부호 · 기호만 뺀다.
 PUNCT = {"SF", "SP", "SS", "SSO", "SSC", "SE", "SO", "SW"}
@@ -116,31 +117,22 @@ def keep(tokens, pos):
 def make_vectorizer(cfg):
     common = dict(sublinear_tf=cfg["sublinear"], max_df=cfg["max_df"], min_df=cfg["min_df"],
                   ngram_range=tuple(cfg["ngram"]))
-    if cfg["analyzer"] == "word":  # 이미 토큰이 공백으로 이어진 글
-        return TfidfVectorizer(tokenizer=str.split, token_pattern=None, lowercase=True, **common)
-    return TfidfVectorizer(analyzer="char_wb", lowercase=True, **common)
+    # 토큰이 이미 공백으로 이어진 글이므로 공백으로 나눈다
+    return TfidfVectorizer(tokenizer=str.split, token_pattern=None, lowercase=True, **common)
 
 
 def family(cfg):
-    if cfg["analyzer"] == "char_wb":
-        return "TF-IDF + char N-gram"
+    """n-gram 최대 길이가 1 이면 'TF-IDF', 1 보다 크면 'TF-IDF + N-gram' (Notion 의 두 모델)."""
     return "TF-IDF" if cfg["ngram"][1] == 1 else "TF-IDF + N-gram"
 
 
 def describe(cfg):
-    if cfg["analyzer"] == "char_wb":
-        tok = "char_wb"
-    else:
-        tok = f"Kiwi({cfg['pos']})"
-    return (f"{tok}, ngram={tuple(cfg['ngram'])}, sublinear_tf={cfg['sublinear']}, "
+    return (f"Kiwi({cfg['pos']}), ngram={tuple(cfg['ngram'])}, sublinear_tf={cfg['sublinear']}, "
             f"max_df={cfg['max_df']}, min_df={cfg['min_df']}")
 
 
 def texts_for(cfg, tokenized, corpus, val, test):
     """(문서 글, {'validation': 질문 글, 'test': 질문 글}) — 문서와 질문을 같은 방식으로 만든다."""
-    if cfg["analyzer"] == "char_wb":
-        return ([d["search_text"] for d in corpus],
-                {"validation": [q["question"] for q in val], "test": [q["question"] for q in test]})
     p = cfg["pos"]
     return ([keep(t, p) for t in tokenized["corpus"]],
             {"validation": [keep(t, p) for t in tokenized["validation"]],
@@ -188,8 +180,6 @@ def grid_configs():
     for pos, ng, sub, mdf in itertools.product(
             ["all", "content", "noun"], [(1, 1), (1, 2), (1, 3)], [False, True], [1.0, 0.5]):
         cfgs.append(dict(analyzer="word", pos=pos, ngram=list(ng), sublinear=sub, max_df=mdf, min_df=1))
-    for ng, sub in itertools.product([(2, 4), (3, 5)], [False, True]):  # README 참고 기준 (char_wb 2~4)
-        cfgs.append(dict(analyzer="char_wb", pos=None, ngram=list(ng), sublinear=sub, max_df=1.0, min_df=1))
     return cfgs
 
 
@@ -256,7 +246,7 @@ def cmd_grid(args):
         w.writerows(r for r, _ in rows)
 
     best = {}
-    for fam in ("TF-IDF", "TF-IDF + N-gram", "TF-IDF + char N-gram"):
+    for fam in SLUG:
         cands = [(r, c) for r, c in rows if r["family"] == fam]
         r, c = max(cands, key=lambda rc: rc[0]["ndcg3"])  # 선택 기준: validation NDCG@3
         best[fam] = dict(config=c, validation=dict(precision3=r["precision3"], recall3=r["recall3"],
@@ -268,7 +258,7 @@ def cmd_grid(args):
     print("Model | Key settings | Precision@3 | Recall@3 | NDCG@3")
     for fam, b in best.items():
         v = b["validation"]
-        slug = {"TF-IDF": "tfidf", "TF-IDF + N-gram": "tfidf-ngram", "TF-IDF + char N-gram": "tfidf-char"}[fam]
+        slug = SLUG[fam]
         write_preds(OUT / f"{slug}-validation.jsonl", predict(b["config"], "validation", data), val)
         print(f"{fam} | {describe(b['config'])} | {v['precision3']:.4f} | {v['recall3']:.4f} | {v['ndcg3']:.4f}")
 
@@ -284,7 +274,7 @@ def cmd_final(_args):
     corpus, val, test = load_all()
     data = (corpus, val, test, get_tokenized(corpus, val, test))
     for fam, b in best.items():
-        slug = {"TF-IDF": "tfidf", "TF-IDF + N-gram": "tfidf-ngram", "TF-IDF + char N-gram": "tfidf-char"}[fam]
+        slug = SLUG[fam]
         write_preds(OUT / f"{slug}-test.jsonl", predict(b["config"], "test", data), test)
         print(f"쓴 파일: {OUT / (slug + '-test.jsonl')}")
 

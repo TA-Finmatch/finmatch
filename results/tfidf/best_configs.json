@@ -34,23 +34,5 @@
       "recall3": 0.14552083333333335,
       "ndcg3": 0.14328109227452437
     }
-  },
-  "TF-IDF + char N-gram": {
-    "config": {
-      "analyzer": "char_wb",
-      "pos": null,
-      "ngram": [
-        2,
-        4
-      ],
-      "sublinear": true,
-      "max_df": 1.0,
-      "min_df": 1
-    },
-    "validation": {
-      "precision3": 0.06588541666666665,
-      "recall3": 0.093984375,
-      "ndcg3": 0.09266237025651297
-    }
   }
 }
